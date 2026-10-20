@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#05070a" />
+  <title>死潮 DEAD TIDE — 码头生存</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070a'/%3E%3Cpath d='M7 24V8h5v10h3V8h5v16h-5v-4h-3v4z' fill='%23a91925'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="stage" aria-label="死潮：码头僵尸生存游戏">
+    <canvas id="game" width="480" height="270" aria-label="游戏画面"></canvas>
+
+    <div class="screen-fx" aria-hidden="true">
+      <div class="scanlines"></div>
+      <div class="grain"></div>
+      <div class="vignette"></div>
+      <div class="edge-wear"></div>
+    </div>
+
+    <div id="hud" class="hud is-hidden" aria-label="游戏状态">
+      <div class="hud-top">
+        <div class="brand">
+          <span class="brand-glyph">☣</span>
+          <span class="brand-main">DOCK 07</span>
+          <span class="brand-sub">// 封锁区</span>
+          <span class="build-count">强化 <b id="upgradeCount">0</b></span>
+        </div>
+
+        <div class="wave-readout">
+          <span class="micro-label">WAVE / 波次</span>
+          <strong id="waveNum">01</strong>
+          <span class="wave-sub"><i id="threatDot"></i><span id="waveStateLabel">尸潮接近</span><b id="phaseLabel" class="phase-label">夜色</b></span>
+        </div>
+
+        <div class="score-readout">
+          <span class="micro-label">SCORE / 分数</span>
+          <strong id="scoreNum">000000</strong>
+          <span class="score-sub"><span id="killNum">0</span> KILLS</span>
+        </div>
+      </div>
+
+      <div id="bossBar" class="boss-bar is-hidden">
+        <div class="boss-head">
+          <span class="boss-label">BOSS</span>
+          <strong id="bossName">潮汐暴君</strong>
+          <em id="bossHpText">100%</em>
+        </div>
+        <div class="boss-meter"><i id="bossFill"></i></div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="vitals">
+          <div class="panel-head">
+            <span>VITALS</span>
+            <span id="healthNum">100</span>
+          </div>
+          <div class="meter health-meter">
+            <i id="healthFill"></i>
+            <span class="meter-ticks"></span>
+          </div>
+          <div class="stamina-row">
+            <span>体力</span>
+            <div class="meter stamina-meter"><i id="staminaFill"></i></div>
+            <span class="key-hint">SHIFT</span>
+          </div>
+          <div class="stamina-row fuel-row">
+            <span>燃料</span>
+            <div class="meter fuel-meter" id="fuelMeter"><i id="fuelFill"></i></div>
+            <span class="key-hint">W</span>
+          </div>
+        </div>
+
+        <div class="field-tip" id="fieldTip">
+          <span><b>A</b><b>D</b> 移动</span>
+          <span><b>左键</b> 射击</span>
+          <span><b>W</b> 喷气背包</span>
+          <span><b>G</b> 手雷</span>
+          <span><b>SPACE</b> 闪避</span>
+          <span><b>1-4</b> 武器</span>
+        </div>
+
+        <div class="loadout">
+          <div class="weapon-head">
+            <span class="micro-label">WEAPON</span>
+            <span id="weaponTag">制式手枪</span>
+          </div>
+          <div class="weapon-line">
+            <strong id="weaponName">M1911</strong>
+            <div class="ammo">
+              <strong id="ammoMag">12</strong>
+              <span class="ammo-slash">/</span>
+              <em id="ammoReserve">60</em>
+            </div>
+          </div>
+          <div class="reload-track" id="reloadTrack"><i id="reloadFill"></i></div>
+          <div class="spin-track is-hidden" id="spinTrack"><span id="spinLabel">SPIN</span><div class="spin-meter"><i id="spinFill"></i></div></div>
+          <div class="weapon-slots" id="weaponSlots"></div>
+          <div class="ability-row">
+            <span class="grenade-chip"><b>G</b> 手雷 <em id="grenadeCount">3</em></span>
+            <span class="jet-chip"><b>W</b> 喷气背包</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="mutationStrip" class="mutation-strip is-hidden">
+        <span class="mutation-label">感染进化</span>
+        <div id="mutationChips" class="mutation-chips"></div>
+      </div>
+
+      <div id="relicStrip" class="mutation-strip relic-strip is-hidden">
+        <span class="mutation-label">遗物</span>
+        <div id="relicChips" class="mutation-chips"></div>
+      </div>
+
+      <button id="pauseBtn" class="pause-btn" type="button" aria-label="暂停游戏">II <span>暂停</span></button>
+      <div class="corner corner-tl" aria-hidden="true"></div>
+      <div class="corner corner-tr" aria-hidden="true"></div>
+      <div class="corner corner-bl" aria-hidden="true"></div>
+      <div class="corner corner-br" aria-hidden="true"></div>
+    </div>
+
+    <div id="waveBanner" class="wave-banner" aria-live="polite">
+      <span id="bannerKicker">WAVE 01</span>
+      <strong id="bannerTitle">第 1 波</strong>
+      <p id="bannerSub">它们从潮水里爬出来了</p>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite">
+      <span id="toastIcon">+</span><span id="toastText">拾取物资</span>
+    </div>
+
+    <section id="titleScreen" class="overlay title-screen">
+      <div class="title-copy">
+        <div class="eyebrow"><span class="pulse-dot"></span> CARGO TERMINAL 07 <span class="slash">/</span> 03:17 AM</div>
+        <h1>
+          <span class="title-main">DEAD<span class="title-tide">TIDE</span></span>
+          <span class="title-cn">死 潮</span>
+        </h1>
+        <p class="tagline">潮水把死人送了回来。<br />喷气背包、Boss 遗物、有限弹药。每 6 波，海面会站起来一个更大的东西。</p>
+
+        <div class="title-actions">
+          <button id="startBtn" class="pixel-btn primary" type="button">
+            <span>进入码头</span>
+            <em>ENTER THE DOCK</em>
+          </button>
+          <button id="howBtn" class="pixel-btn ghost" type="button">操作说明</button>
+        </div>
+
+        <div class="title-warning">
+          <span class="warning-stripes"></span>
+          <p><b>警告</b> 无尽尸潮 + 每 6 波 Boss。W 升空、Space 闪避、G 投雷。弹药有限，手枪无限；Boss 掉落遗物。</p>
+        </div>
+      </div>
+
+      <aside class="title-meta" aria-label="任务信息">
+        <div class="meta-stamp">隔离区<br /><b>QUARANTINE</b></div>
+        <dl>
+          <div><dt>地点</dt><dd>7 号货运码头</dd></div>
+          <div><dt>失联</dt><dd>37 小时</dd></div>
+          <div><dt>幸存者</dt><dd>1</dd></div>
+          <div><dt>状态</dt><dd>无尽 / BOSS</dd></div>
+        </dl>
+        <p class="meta-line">活着。或者变成它们的一部分。</p>
+      </aside>
+
+      <div class="title-foot">
+        <span>建议佩戴耳机</span>
+        <span>键鼠操作</span>
+        <span>最高波次 <b id="titleBestWave">00</b> · 最高分 <b id="titleHighScore">000000</b></span>
+      </div>
+    </section>
+
+    <section id="helpScreen" class="overlay help-screen is-hidden">
+      <div class="help-card">
+        <div class="eyebrow"><span class="pulse-dot"></span> 生存手册</div>
+        <h2>别让它们碰到你。</h2>
+        <div class="help-grid">
+          <div><b class="keycap">A</b><b class="keycap">D</b><span>左右移动</span></div>
+          <div><b class="keycap wide">SHIFT</b><span>消耗体力冲刺</span></div>
+          <div><b class="keycap wide">W</b><span>按住点燃喷气背包</span></div>
+          <div><b class="keycap wide">SPACE</b><span>闪避，短暂无敌</span></div>
+          <div><b class="keycap wide">鼠标</b><span>瞄准，左键开火</span></div>
+          <div><b class="keycap">R</b><span>装填弹药</span></div>
+          <div><b class="keycap">G</b><span>投掷手雷</span></div>
+          <div><b class="keycap">1</b><b class="keycap">-</b><b class="keycap">4</b><span>切换武器</span></div>
+          <div><b class="keycap">ESC</b><span>暂停游戏</span></div>
+          <div><b class="keycap">M</b><span>静音 / 恢复</span></div>
+        </div>
+        <p class="help-note">无尽尸潮。每波结束三选一强化，首波后获得 M134。W 升空，SPACE 闪避，G 投掷手雷。每 6 波出现 Boss；击杀后可选择一件遗物。弹药有限，M1911 手枪无限；尖啸者会强化尸群，盾卫会挡住正面子弹。</p>
+        <button id="helpCloseBtn" class="pixel-btn primary" type="button"><span>明白了</span><em>BACK</em></button>
+      </div>
+    </section>
+
+    <section id="pauseScreen" class="overlay menu-screen is-hidden">
+      <div class="menu-card">
+        <div class="eyebrow"><span class="pulse-dot"></span> 信号中断</div>
+        <h2>暂停</h2>
+        <p class="menu-sub">潮水还在外面等着。</p>
+        <button id="resumeBtn" class="pixel-btn primary" type="button"><span>继续生存</span><em>RESUME</em></button>
+        <button id="restartBtn" class="pixel-btn ghost" type="button">重新开始</button>
+        <div class="menu-controls">
+          <span><b>ESC</b> 继续</span><span><b>M</b> 静音</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="upgradeScreen" class="overlay upgrade-screen is-hidden" aria-label="波次强化选择">
+      <div class="upgrade-shell">
+        <div class="upgrade-header">
+          <div>
+            <div id="upgradeEyebrow" class="eyebrow"><span class="pulse-dot"></span> SCAVENGE &amp; MODIFY <span class="slash">/</span> 第 <span id="upgradeWave">01</span> 波肃清</div>
+            <h2 id="upgradeTitle">选择一项强化</h2>
+            <p id="upgradeSubtitle" class="upgrade-sub">每一次选择，都会改变这一局的死法。</p>
+          </div>
+          <div class="upgrade-run-info">本局强化 <b id="upgradeCountInline">0</b><span>感染进化 <em id="upgradeEvolutionInline">尚未开始</em></span></div>
+        </div>
+        <div id="upgradeGrid" class="upgrade-grid"></div>
+        <div class="upgrade-foot">
+          <span class="upgrade-hint">按 <b>1</b> <b>2</b> <b>3</b> 选择，或点击卡牌</span>
+          <button id="upgradeRerollBtn" class="pixel-btn ghost upgrade-reroll" type="button">
+            <span>刷新一次</span><em>REROLL · R</em>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameoverScreen" class="overlay gameover-screen is-hidden">
+      <div class="death-vignette"></div>
+      <div class="gameover-card">
+        <div class="death-label">VITAL SIGNAL LOST</div>
+        <h2>你被<br /><span>拖进了潮水</span></h2>
+        <p id="epitaph" class="epitaph">7 号码头，再次归于死寂。</p>
+        <div class="run-stats">
+          <div><span>存活波次</span><strong id="finalWave">01</strong></div>
+          <div><span>击杀</span><strong id="finalKills">0</strong></div>
+          <div><span>爆头</span><strong id="finalHeads">0</strong></div>
+          <div><span>得分</span><strong id="finalScore">000000</strong></div>
+        </div>
+        <div class="run-extra">Boss 击杀 <b id="finalBosses">0</b> · 遗物 <b id="finalRelics">0</b></div>
+        <div class="best-line">最高波次 <b id="bestWave">00</b> · 本地最高分 <b id="bestScore">000000</b><span id="newBest" class="new-best">NEW RECORD</span></div>
+        <button id="againBtn" class="pixel-btn primary" type="button"><span>再撑一会儿</span><em>TRY AGAIN</em></button>
+        <p class="gameover-hint">按 <b>ENTER</b> 重新开始</p>
+      </div>
+    </section>
+
+    <div id="rotateHint" class="rotate-hint">
+      <strong>请横屏游玩</strong>
+      <span>建议使用键盘与鼠标</span>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
